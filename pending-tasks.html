@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Bvue42 Lite — Pending Tasks</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="db.js"></script>
+<link rel="manifest" href="manifest.json">
+
+<meta name="theme-color" content="#020617">
+
+<link rel="icon" href="icons/icon-192.png">
+
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+
+</head>
+
+<body class="bg-slate-950 text-white min-h-screen">
+
+<div class="max-w-6xl mx-auto px-4 py-8">
+
+    <!-- Header -->
+    <div class="flex items-start gap-4 mb-8">
+
+        <button
+        onclick="window.location.href='owner-dashboard.html'"
+        class="bg-slate-900 hover:bg-slate-800 border border-slate-700 w-12 h-12 rounded-2xl text-2xl transition">
+            ←
+        </button>
+
+        <div>
+            <h1 class="text-3xl font-bold">
+                Pending Tasks
+            </h1>
+
+            <p class="text-slate-400 mt-1">
+                Tasks waiting to be completed
+            </p>
+        </div>
+
+    </div>
+
+    <div
+    id="tasksContainer"
+    class="space-y-5">
+
+        <div
+        class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+
+            Loading Pending Tasks...
+
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+
+async function guardOwner(){
+
+const {data:{session}}=await sb.auth.getSession();
+
+if(!session){
+
+window.location.href="owner-login.html";
+return null;
+
+}
+
+return session;
+
+}
+
+function card(task){
+
+return`
+
+<div class="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+
+<div class="flex justify-between items-start">
+
+<div>
+
+<h2 class="text-2xl font-semibold">
+${task.task_title}
+</h2>
+
+<p class="text-slate-400 mt-2">
+Assigned to :
+${task.employee_name}
+</p>
+
+</div>
+
+<span class="px-4 py-2 rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+
+Pending
+
+</span>
+
+</div>
+
+<div class="mt-5">
+
+<div class="bg-slate-950 border border-slate-800 rounded-xl p-5">
+
+<p class="text-slate-400 text-sm mb-2">
+Timeline
+</p>
+
+<p class="text-xl font-semibold">
+${task.timeline_hours} Hours
+</p>
+
+</div>
+
+<div class="bg-slate-950 border border-slate-800 rounded-xl p-5 mt-4">
+
+<p class="text-slate-400 text-sm mb-2">
+Task Note
+</p>
+
+<p>
+${task.task_note}
+</p>
+
+</div>
+
+</div>
+
+</div>
+
+`;
+
+}
+
+async function loadTasks(){
+
+await guardOwner();
+
+const companyId=localStorage.getItem("bvue_company_id");
+
+const {data,error}=await sb
+
+.from("tasks")
+
+.select("*")
+
+.eq("company_id",companyId)
+
+.eq("status","pending")
+
+.order("created_at",{ascending:false});
+
+if(error){
+
+console.log(error);
+
+return;
+
+}
+
+const container=document.getElementById("tasksContainer");
+
+if(data.length===0){
+
+container.innerHTML=`
+
+<div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center">
+
+No Pending Tasks 🎉
+
+</div>
+
+`;
+
+return;
+
+}
+
+container.innerHTML=data.map(card).join("");
+
+}
+
+loadTasks();
+
+</script>
+
+</body>
+</html>

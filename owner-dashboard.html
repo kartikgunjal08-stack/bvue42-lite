@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bvue42 Lite — Owner Dashboard</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="db.js"></script>
+  <link rel="manifest" href="manifest.json">
+
+<meta name="theme-color" content="#020617">
+
+<link rel="icon" href="icons/icon-192.png">
+
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+</head>
+<body class="bg-slate-950 text-white min-h-screen">
+  <div class="max-w-6xl mx-auto px-4 py-8">
+
+    <!-- Top -->
+    <div class="flex items-start justify-between gap-4 mb-8">
+      <div>
+        <h1 class="text-3xl font-bold">Owner Dashboard</h1>
+        <p id="companyHeading" class="text-slate-400 mt-1">Loading company...</p>
+      </div>
+
+      <button id="openSettingsBtn"
+        class="bg-slate-900 hover:bg-slate-800 border border-slate-700 w-14 h-14 rounded-2xl flex items-center justify-center text-2xl transition">
+        ⚙
+      </button>
+    </div>
+
+    <!-- Overview -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+        <p class="text-sm text-slate-400 mb-2">Employees</p>
+        <p id="employeesCount" class="text-3xl font-bold">0</p>
+      </div>
+
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+        <p class="text-sm text-slate-400 mb-2">Assigned</p>
+        <p id="assignedCount" class="text-3xl font-bold">0</p>
+      </div>
+
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+        <p class="text-sm text-slate-400 mb-2"><a href="pending-tasks.html">
+    <!-- Pending Card -->
+</a></p>
+<p class="text-sm text-slate-400 mb-2">Pending</p>
+<p id="pendingCount" class="text-3xl font-bold text-yellow-400">0</p>
+      </div>
+
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+        <p class="text-sm text-slate-400 mb-2">Completed</p>
+        <p id="completedCount" class="text-3xl font-bold text-emerald-400">0</p>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+      <h2 class="text-2xl font-semibold mb-6">Quick Actions</h2>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <a href="add-employee.html"
+          class="bg-emerald-500 hover:bg-emerald-400 text-black font-semibold py-4 rounded-xl text-center transition">
+          Add Employee
+        </a>
+
+        <a href="view-employees.html"
+          class="bg-slate-800 hover:bg-slate-700 text-white font-semibold py-4 rounded-xl text-center transition">
+          View Employees
+        </a>
+
+        <a href="assign-task.html"
+          class="bg-slate-800 hover:bg-slate-700 text-white font-semibold py-4 rounded-xl text-center transition">
+          Assign Task
+        </a>
+
+        <a href="completed-tasks.html"
+          class="bg-slate-800 hover:bg-slate-700 text-white font-semibold py-4 rounded-xl text-center transition">
+          Completed Tasks
+        </a>
+
+        <a href="pending-tasks.html"
+  class="bg-slate-800 hover:bg-slate-700 text-white font-semibold py-4 rounded-xl text-center transition">
+  Pending Tasks
+</a>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settingsModal" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 px-4">
+    <div class="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl relative">
+      
+      <button id="closeSettingsBtn"
+        class="absolute top-5 right-5 text-slate-400 hover:text-white text-3xl leading-none">
+        ×
+      </button>
+
+      <h2 class="text-3xl font-bold mb-6">Settings</h2>
+
+      <div class="space-y-4">
+        <div class="bg-slate-950 border border-slate-800 rounded-2xl p-5">
+          <p class="text-sm text-slate-400 mb-1">Owner Name</p>
+          <p id="ownerName" class="text-xl font-semibold">---</p>
+        </div>
+
+        <div class="bg-slate-950 border border-slate-800 rounded-2xl p-5">
+          <p class="text-sm text-slate-400 mb-1">Login Email</p>
+          <p id="ownerEmail" class="text-xl font-semibold break-all">---</p>
+        </div>
+
+        <div class="bg-slate-950 border border-slate-800 rounded-2xl p-5">
+          <p class="text-sm text-slate-400 mb-1">Company Name</p>
+          <p id="companyName" class="text-xl font-semibold">---</p>
+        </div>
+
+        <div class="bg-slate-950 border border-slate-800 rounded-2xl p-5">
+          <p class="text-sm text-slate-400 mb-1">Workspace Code</p>
+          <p id="workspaceCode" class="text-xl font-semibold text-emerald-400">---</p>
+        </div>
+
+        <button id="logoutBtn"
+          class="w-full bg-red-500 hover:bg-red-400 text-white font-semibold py-4 rounded-2xl transition mt-2">
+          Logout
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function guardOwner() {
+      const { data: { session }, error } = await sb.auth.getSession();
+
+      if (error || !session || !session.user) {
+        window.location.href = "owner-login.html";
+        return null;
+      }
+
+      return session.user;
+    }
+
+    async function loadDashboard() {
+      try {
+        const user = await guardOwner();
+        if (!user) return;
+
+        const companyId = localStorage.getItem("bvue_company_id");
+        if (!companyId) throw new Error("Missing company session. Login again.");
+
+        const ownerName = localStorage.getItem("bvue_owner_name") || "Owner";
+
+        // company info
+        const { data: company, error: companyError } = await sb
+          .from("companies")
+          .select("*")
+          .eq("id", companyId)
+          .single();
+
+        if (companyError || !company) throw new Error("Could not load company info.");
+
+        // employees count
+        const { count: employeesCount, error: employeesError } = await sb
+          .from("employees")
+          .select("*", { count: "exact", head: true })
+          .eq("company_id", companyId);
+
+        if (employeesError) throw employeesError;
+
+        // all tasks for this company
+        const { data: tasks, error: tasksError } = await sb
+          .from("tasks")
+          .select("id, employee_id, status")
+          .eq("company_id", companyId);
+
+        if (tasksError) throw tasksError;
+
+        const allTasks = tasks || [];
+
+      // Dashboard Statistics
+const assignedCount = allTasks.length;
+
+const pendingCount = allTasks.filter(
+  task => task.status === "pending"
+).length;
+
+const completedCount = allTasks.filter(
+  task => task.status === "completed"
+).length;
+
+        // top heading
+        document.getElementById("companyHeading").textContent = company.company_name || "Workspace";
+
+        // overview
+        document.getElementById("employeesCount").textContent = employeesCount || 0;
+        document.getElementById("assignedCount").textContent = assignedCount || 0;
+        document.getElementById("pendingCount").textContent = pendingCount || 0;
+        document.getElementById("completedCount").textContent = completedCount || 0;
+
+        // settings
+        document.getElementById("ownerName").textContent = ownerName;
+        document.getElementById("ownerEmail").textContent = user.email || "---";
+        document.getElementById("companyName").textContent = company.company_name || "---";
+        document.getElementById("workspaceCode").textContent = company.workspace_code || "---";
+
+      } catch (err) {
+        console.error("Owner dashboard load error:", err);
+        document.getElementById("companyHeading").textContent = "Could not load company";
+      }
+    }
+
+    // settings modal
+    const settingsModal = document.getElementById("settingsModal");
+    const openSettingsBtn = document.getElementById("openSettingsBtn");
+    const closeSettingsBtn = document.getElementById("closeSettingsBtn");
+
+    openSettingsBtn.addEventListener("click", () => {
+      settingsModal.classList.remove("hidden");
+      settingsModal.classList.add("flex");
+    });
+
+    closeSettingsBtn.addEventListener("click", () => {
+      settingsModal.classList.add("hidden");
+      settingsModal.classList.remove("flex");
+    });
+
+    settingsModal.addEventListener("click", (e) => {
+      if (e.target === settingsModal) {
+        settingsModal.classList.add("hidden");
+        settingsModal.classList.remove("flex");
+      }
+    });
+
+    document.getElementById("logoutBtn").addEventListener("click", async () => {
+      await sb.auth.signOut();
+
+      localStorage.removeItem("bvue_company_id");
+      localStorage.removeItem("bvue_owner_name");
+
+      window.location.href = "owner-login.html";
+    });
+
+    loadDashboard();
+  </script>
+</body>
+</html>

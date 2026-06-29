@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bvue42 Lite — View Tasks</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="db.js"></script>
+  <link rel="manifest" href="manifest.json">
+
+<meta name="theme-color" content="#020617">
+
+<link rel="icon" href="icons/icon-192.png">
+
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+</head>
+<body class="bg-slate-950 text-white min-h-screen">
+
+  <div class="max-w-6xl mx-auto px-4 py-8">
+
+    <!-- Top -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+      <div>
+        <h1 class="text-3xl font-bold">Tasks</h1>
+        <p class="text-slate-400 mt-1">All assigned tasks in your workspace</p>
+      </div>
+
+      <div class="flex gap-3">
+        <a href="assign-task.html"
+          class="bg-emerald-500 hover:bg-emerald-400 text-black font-semibold px-5 py-3 rounded-xl transition">
+          Assign Task
+        </a>
+
+        <a href="owner-dashboard.html"
+          class="bg-slate-900 hover:bg-slate-800 border border-slate-700 px-5 py-3 rounded-xl transition">
+          Back
+        </a>
+      </div>
+    </div>
+
+    <!-- Tasks Container -->
+    <div id="tasksContainer" class="space-y-4">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-slate-400">
+        Loading tasks...
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    async function guardOwner() {
+      const { data: { session }, error } = await sb.auth.getSession();
+
+      if (error || !session || !session.user) {
+        window.location.href = "owner-login.html";
+        return null;
+      }
+
+      return session.user;
+    }
+
+    function statusBadge(status) {
+      if (status === "pending") {
+        return "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30";
+      }
+      if (status === "completed") {
+        return "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+      }
+      return "bg-slate-700 text-slate-300 border border-slate-600";
+    }
+
+    function taskCard(task) {
+      return `
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+          <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+            
+            <div>
+              <h2 class="text-xl font-semibold">${task.task_title || "---"}</h2>
+              <p class="text-slate-400 mt-1">Assigned to: ${task.employee_name || "---"}</p>
+            </div>
+
+            <div>
+              <span class="inline-block px-3 py-1 rounded-full text-sm font-medium ${statusBadge(task.status)}">
+                ${task.status || "unknown"}
+              </span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-5">
+            <div class="bg-slate-950 border border-slate-800 rounded-xl p-4">
+              <p class="text-sm text-slate-400 mb-1">Timeline</p>
+              <p class="font-medium">${task.timeline_hours || 0} hours</p>
+            </div>
+
+            <div class="bg-slate-950 border border-slate-800 rounded-xl p-4 md:col-span-2">
+              <p class="text-sm text-slate-400 mb-1">Task Note</p>
+              <p class="font-medium whitespace-pre-wrap">${task.task_note || "---"}</p>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    async function loadTasks() {
+      try {
+        const user = await guardOwner();
+        if (!user) return;
+
+        const companyId = localStorage.getItem("bvue_company_id");
+        if (!companyId) throw new Error("Missing company session data. Login again.");
+
+        const { data: tasks, error } = await sb
+          .from("tasks")
+          .select("*")
+          .eq("company_id", companyId)
+          .order("created_at", { ascending: false });
+
+        if (error) throw error;
+
+        const container = document.getElementById("tasksContainer");
+
+        if (!tasks || tasks.length === 0) {
+          container.innerHTML = `
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center">
+              <p class="text-lg font-semibold">No tasks yet</p>
+              <p class="text-slate-400 mt-2">Assign your first task to start using Bvue42 Lite task tracking.</p>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = tasks.map(taskCard).join("");
+
+      } catch (err) {
+        console.error("Load tasks error:", err);
+        document.getElementById("tasksContainer").innerHTML = `
+          <div class="bg-slate-900 border border-red-500/30 rounded-2xl p-6 text-red-400">
+            ${err.message || "Could not load tasks."}
+          </div>
+        `;
+      }
+    }
+
+    loadTasks();
+  </script>
+</body>
+</html>

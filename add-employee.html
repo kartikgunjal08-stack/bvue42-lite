@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bvue42 Lite — Add Employee</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="db.js"></script>
+</head>
+<body class="bg-slate-950 text-white min-h-screen">
+
+  <div class="max-w-3xl mx-auto px-4 py-8">
+    
+    <!-- Top -->
+    <div class="flex items-center justify-between mb-8">
+      <div>
+        <h1 class="text-3xl font-bold">Add Employee</h1>
+        <p class="text-slate-400 mt-1">Create a new employee inside your workspace</p>
+      </div>
+
+      <a href="owner-dashboard.html"
+        class="bg-slate-900 hover:bg-slate-800 border border-slate-700 px-4 py-2 rounded-xl transition">
+        Back
+      </a>
+    </div>
+
+    <!-- Form Card -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+      <form id="employeeForm" class="space-y-4">
+
+        <div>
+          <label class="block text-sm mb-2">Full Name</label>
+          <input id="fullName" type="text" required
+            class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 outline-none focus:border-emerald-500"
+            placeholder="Enter employee name" />
+        </div>
+
+        <div>
+          <label class="block text-sm mb-2">Email</label>
+          <input id="email" type="email" required
+            class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 outline-none focus:border-emerald-500"
+            placeholder="Enter employee email" />
+        </div>
+
+        <div>
+          <label class="block text-sm mb-2">Phone</label>
+          <input id="phone" type="text"
+            class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 outline-none focus:border-emerald-500"
+            placeholder="Enter phone number" />
+        </div>
+
+        <div>
+          <label class="block text-sm mb-2">Role Title</label>
+          <input id="roleTitle" type="text"
+            class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 outline-none focus:border-emerald-500"
+            placeholder="Example: Video Editor, Sales Staff, Designer" />
+        </div>
+
+        <div>
+          <label class="block text-sm mb-2">Department</label>
+          <input id="department" type="text"
+            class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 outline-none focus:border-emerald-500"
+            placeholder="Example: Editing, Sales, Marketing" />
+        </div>
+
+        <button id="saveEmployeeBtn" type="submit"
+          class="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-semibold py-3 rounded-xl transition">
+          Save Employee
+        </button>
+
+        <p id="message" class="text-sm mt-2"></p>
+      </form>
+    </div>
+
+  </div>
+
+  <script>
+    function setMessage(text, type = "info") {
+      const msg = document.getElementById("message");
+      msg.textContent = text;
+
+      if (type === "error") {
+        msg.className = "text-sm mt-2 text-red-400";
+      } else if (type === "success") {
+        msg.className = "text-sm mt-2 text-emerald-400";
+      } else {
+        msg.className = "text-sm mt-2 text-slate-400";
+      }
+    }
+
+    async function guardOwner() {
+      const { data: { session }, error } = await sb.auth.getSession();
+
+      if (error || !session || !session.user) {
+        window.location.href = "owner-login.html";
+        return null;
+      }
+
+      return session.user;
+    }
+
+    document.getElementById("employeeForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const btn = document.getElementById("saveEmployeeBtn");
+      btn.disabled = true;
+      btn.textContent = "Saving...";
+
+      try {
+        const user = await guardOwner();
+        if (!user) return;
+
+        const companyId = localStorage.getItem("bvue_company_id");
+        const workspaceCode = localStorage.getItem("bvue_workspace_code");
+        const ownerName = localStorage.getItem("bvue_owner_name");
+
+        if (!companyId || !workspaceCode) {
+          throw new Error("Missing workspace session data. Login again.");
+        }
+
+        const fullName = document.getElementById("fullName").value.trim();
+        const email = document.getElementById("email").value.trim().toLowerCase();
+        const phone = document.getElementById("phone").value.trim();
+        const roleTitle = document.getElementById("roleTitle").value.trim();
+        const department = document.getElementById("department").value.trim();
+
+        if (!fullName || !email) {
+          throw new Error("Full name and email are required.");
+        }
+
+        // duplicate email check inside same company
+        const { data: existingEmployee, error: checkError } = await sb
+          .from("employees")
+          .select("id")
+          .eq("company_id", companyId)
+          .eq("email", email)
+          .maybeSingle();
+
+        if (checkError) throw checkError;
+        if (existingEmployee) {
+          throw new Error("This employee email already exists in your workspace.");
+        }
+
+        const { error: insertError } = await sb
+          .from("employees")
+          .insert({
+            company_id: companyId,
+            owner_user_id: user.id,
+            full_name: fullName,
+            email: email,
+            phone: phone || null,
+            role_title: roleTitle || null,
+            department: department || null,
+            workspace_code: workspaceCode,
+            status: "active"
+          });
+
+        if (insertError) throw insertError;
+
+        setMessage("Employee added successfully.", "success");
+        document.getElementById("employeeForm").reset();
+
+      } catch (err) {
+        console.error("Add employee error:", err);
+        setMessage(err.message || "Could not save employee.", "error");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Save Employee";
+      }
+    });
+
+    guardOwner();
+  </script>
+</body>
+</html>

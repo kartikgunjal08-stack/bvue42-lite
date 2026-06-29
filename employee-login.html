@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bvue42 Lite — Employee Login</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="db.js"></script>
+  <link rel="manifest" href="manifest.json">
+
+<meta name="theme-color" content="#020617">
+
+<link rel="icon" href="icons/icon-192.png">
+
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+</head>
+<body class="bg-slate-950 text-white min-h-screen flex items-center justify-center px-4">
+
+  <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
+    <div class="mb-6 text-center">
+      <h1 class="text-3xl font-bold">Employee Login</h1>
+      <p class="text-slate-400 mt-2">Enter your workspace code and email</p>
+    </div>
+
+    <form id="employeeLoginForm" class="space-y-4">
+      <div>
+        <label class="block text-sm mb-2">Workspace Code</label>
+        <input id="workspaceCode" type="text" required
+          class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 outline-none focus:border-emerald-500 uppercase"
+          placeholder="Example: BV42-5946" />
+      </div>
+
+      <div>
+        <label class="block text-sm mb-2">Employee Email</label>
+        <input id="employeeEmail" type="email" required
+          class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 outline-none focus:border-emerald-500"
+          placeholder="Enter your work email" />
+      </div>
+
+      <button id="loginBtn" type="submit"
+        class="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-semibold py-3 rounded-xl transition">
+        Login
+      </button>
+
+      <p id="message" class="text-sm mt-2"></p>
+    </form>
+
+    <div class="mt-6 text-center">
+      <a href="owner-login.html" class="text-slate-400 hover:text-white text-sm">
+        Owner login
+      </a>
+    </div>
+  </div>
+
+  <script>
+    function setMessage(text, type = "info") {
+      const msg = document.getElementById("message");
+      msg.textContent = text;
+
+      if (type === "error") {
+        msg.className = "text-sm mt-2 text-red-400";
+      } else if (type === "success") {
+        msg.className = "text-sm mt-2 text-emerald-400";
+      } else {
+        msg.className = "text-sm mt-2 text-slate-400";
+      }
+    }
+
+    document.getElementById("employeeLoginForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const btn = document.getElementById("loginBtn");
+      btn.disabled = true;
+      btn.textContent = "Checking...";
+
+      try {
+        const workspaceCode = document.getElementById("workspaceCode").value.trim().toUpperCase();
+        const employeeEmail = document.getElementById("employeeEmail").value.trim().toLowerCase();
+
+        if (!workspaceCode || !employeeEmail) {
+          throw new Error("Workspace code and email are required.");
+        }
+
+        // find employee row by workspace code + email
+        const { data: employeeRow, error } = await sb
+          .from("employees")
+          .select("*")
+          .eq("workspace_code", workspaceCode)
+          .eq("email", employeeEmail)
+          .single();
+
+        if (error || !employeeRow) {
+          throw new Error("Employee not found. Check workspace code and email.");
+        }
+
+        // save employee session in localStorage
+       localStorage.setItem("bvue_employee_id", employeeRow.id);
+       localStorage.setItem("bvue_employee_name", employeeRow.full_name || "");
+       localStorage.setItem("bvue_employee_email", employeeRow.email || "");
+       localStorage.setItem("bvue_employee_company_id", employeeRow.company_id || "");
+       localStorage.setItem("bvue_employee_workspace_code", employeeRow.workspace_code || "");
+       localStorage.setItem("bvue_employee_company_name", employeeRow.company_name || "");
+
+        setMessage("Login successful. Redirecting...", "success");
+
+        setTimeout(() => {
+          window.location.href = "employee-dashboard.html";
+        }, 700);
+
+      } catch (err) {
+        console.error("Employee login error:", err);
+        setMessage(err.message || "Could not login.", "error");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Login";
+      }
+    });
+  </script>
+</body>
+</html>

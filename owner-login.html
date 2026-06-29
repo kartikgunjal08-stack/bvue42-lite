@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bvue42 Lite — Owner Login</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="db.js"></script>
+  <link rel="manifest" href="manifest.json">
+
+<meta name="theme-color" content="#020617">
+
+<link rel="icon" href="icons/icon-192.png">
+
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+</head>
+<body class="bg-slate-950 text-white min-h-screen flex items-center justify-center px-4">
+
+  <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
+    <h1 class="text-2xl font-bold mb-2">Owner Login</h1>
+    <p class="text-slate-400 mb-6">Login to your Bvue42 Lite workspace</p>
+
+    <form id="loginForm" class="space-y-4">
+      <div>
+        <label class="block text-sm mb-2">Email</label>
+        <input id="email" type="email" required
+          class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 outline-none focus:border-emerald-500"
+          placeholder="Enter email" />
+      </div>
+
+      <div>
+        <label class="block text-sm mb-2">Bvue42 Password</label>
+        <div class="relative">
+          <input id="password" type="password" required
+            class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 pr-12 outline-none focus:border-emerald-500"
+            placeholder="Enter password" />
+          <button type="button" id="toggleLoginPassword"
+            class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
+            👁
+          </button>
+        </div>
+      </div>
+
+      <button id="loginBtn" type="submit"
+        class="w-full rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-semibold py-3 transition">
+        Login
+      </button>
+    </form>
+
+    <p class="text-sm text-slate-400 mt-5">
+      New owner?
+      <a href="owner-signup.html" class="text-emerald-400 hover:underline">Create workspace</a>
+    </p>
+
+    <p id="message" class="mt-4 text-sm"></p>
+  </div>
+
+  <script>
+    function setMessage(text, type = "info") {
+      const msg = document.getElementById("message");
+      msg.textContent = text;
+
+      if (type === "error") {
+        msg.className = "mt-4 text-sm text-red-400";
+      } else if (type === "success") {
+        msg.className = "mt-4 text-sm text-emerald-400";
+      } else {
+        msg.className = "mt-4 text-sm text-slate-400";
+      }
+    }
+
+    // eye toggle
+    document.getElementById("toggleLoginPassword").addEventListener("click", () => {
+      const input = document.getElementById("password");
+      input.type = input.type === "password" ? "text" : "password";
+    });
+
+    document.getElementById("loginForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const loginBtn = document.getElementById("loginBtn");
+      loginBtn.disabled = true;
+      loginBtn.textContent = "Logging in...";
+
+      const email = document.getElementById("email").value.trim().toLowerCase();
+      const password = document.getElementById("password").value;
+
+      try {
+        if (!email || !password) {
+          throw new Error("Please fill all fields.");
+        }
+
+        const { data: authData, error: authError } = await sb.auth.signInWithPassword({
+          email,
+          password
+        });
+
+        if (authError) throw authError;
+        if (!authData?.user?.id) {
+          throw new Error("Could not login user.");
+        }
+
+        const ownerUserId = authData.user.id;
+
+        const { data: ownerRow, error: ownerError } = await sb
+          .from("users")
+          .select("*")
+          .eq("id", ownerUserId)
+          .eq("role", "owner")
+          .single();
+
+        if (ownerError) throw ownerError;
+        if (!ownerRow) throw new Error("Owner record not found.");
+
+        const { data: companyRow, error: companyError } = await sb
+          .from("companies")
+          .select("*")
+          .eq("id", ownerRow.company_id)
+          .single();
+
+        if (companyError) throw companyError;
+        if (!companyRow) throw new Error("Company record not found.");
+
+        localStorage.setItem("bvue_owner_user_id", ownerRow.id);
+        localStorage.setItem("bvue_company_id", companyRow.id);
+        localStorage.setItem("bvue_company_name", companyRow.company_name);
+        localStorage.setItem("bvue_workspace_code", companyRow.workspace_code);
+        localStorage.setItem("bvue_owner_name", ownerRow.name);
+
+        setMessage("Login successful. Redirecting...", "success");
+
+        setTimeout(() => {
+          window.location.href = "owner-dashboard.html";
+        }, 800);
+
+      } catch (err) {
+        console.error("Login error:", err);
+        setMessage(err.message || "Something went wrong.", "error");
+      } finally {
+        loginBtn.disabled = false;
+        loginBtn.textContent = "Login";
+      }
+    });
+  </script>
+</body>
+</html>

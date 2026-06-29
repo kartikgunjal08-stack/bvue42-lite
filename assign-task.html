@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bvue42 Lite — Assign Task</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="db.js"></script>
+  <link rel="manifest" href="manifest.json">
+
+<meta name="theme-color" content="#020617">
+
+<link rel="icon" href="icons/icon-192.png">
+
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+</head>
+<body class="bg-slate-950 text-white min-h-screen">
+
+  <div class="max-w-3xl mx-auto px-4 py-8">
+
+    <!-- Top -->
+    <div class="flex items-center justify-between mb-8">
+      <div>
+        <h1 class="text-3xl font-bold">Assign Task</h1>
+        <p class="text-slate-400 mt-1">Create and assign a task to an employee</p>
+      </div>
+
+      <a href="owner-dashboard.html"
+         class="bg-slate-900 hover:bg-slate-800 border border-slate-700 px-4 py-2 rounded-xl transition">
+        Back
+      </a>
+    </div>
+
+    <!-- Form -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+      <form id="taskForm" class="space-y-4">
+
+        <div>
+          <label class="block text-sm mb-2">Select Employee</label>
+          <select id="employeeSelect" required
+            class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 outline-none focus:border-emerald-500">
+            <option value="">Loading employees...</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm mb-2">Task Title</label>
+          <input id="taskTitle" type="text" required
+            class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 outline-none focus:border-emerald-500"
+            placeholder="Example: Edit 3 client videos" />
+        </div>
+
+        <div>
+          <label class="block text-sm mb-2">Task Note</label>
+          <textarea id="taskNote" rows="4"
+            class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 outline-none focus:border-emerald-500"
+            placeholder="Add task details or instructions"></textarea>
+        </div>
+
+        <div>
+          <label class="block text-sm mb-2">Timeline (Hours)</label>
+          <input id="timelineHours" type="number" min="1" required
+            class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 outline-none focus:border-emerald-500"
+            placeholder="Example: 6" />
+        </div>
+
+        <button id="assignBtn" type="submit"
+          class="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-semibold py-3 rounded-xl transition">
+          Assign Task
+        </button>
+
+        <p id="message" class="text-sm mt-2"></p>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    function setMessage(text, type = "info") {
+      const msg = document.getElementById("message");
+      msg.textContent = text;
+
+      if (type === "error") {
+        msg.className = "text-sm mt-2 text-red-400";
+      } else if (type === "success") {
+        msg.className = "text-sm mt-2 text-emerald-400";
+      } else {
+        msg.className = "text-sm mt-2 text-slate-400";
+      }
+    }
+
+    async function guardOwner() {
+      const { data: { session }, error } = await sb.auth.getSession();
+
+      if (error || !session || !session.user) {
+        window.location.href = "owner-login.html";
+        return null;
+      }
+
+      return session.user;
+    }
+
+    async function loadEmployees() {
+      try {
+        const companyId = localStorage.getItem("bvue_company_id");
+        if (!companyId) throw new Error("Missing company session data. Login again.");
+
+        const { data: employees, error } = await sb
+          .from("employees")
+          .select("id, full_name, email")
+          .eq("company_id", companyId)
+          .order("created_at", { ascending: false });
+
+        if (error) throw error;
+
+        const select = document.getElementById("employeeSelect");
+
+        if (!employees || employees.length === 0) {
+          select.innerHTML = `<option value="">No employees found</option>`;
+          return;
+        }
+
+        select.innerHTML = `
+          <option value="">Select employee</option>
+          ${employees.map(emp => `
+            <option value="${emp.id}" data-name="${emp.full_name}">
+              ${emp.full_name} (${emp.email})
+            </option>
+          `).join("")}
+        `;
+      } catch (err) {
+        console.error("Load employees error:", err);
+        setMessage(err.message || "Could not load employees.", "error");
+      }
+    }
+
+    document.getElementById("taskForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const btn = document.getElementById("assignBtn");
+      btn.disabled = true;
+      btn.textContent = "Assigning...";
+
+      try {
+        const user = await guardOwner();
+        if (!user) return;
+
+        const companyId = localStorage.getItem("bvue_company_id");
+        if (!companyId) throw new Error("Missing company session data. Login again.");
+
+        const employeeSelect = document.getElementById("employeeSelect");
+        const employeeId = employeeSelect.value;
+        const employeeName = employeeSelect.options[employeeSelect.selectedIndex]?.dataset?.name || "";
+
+        const taskTitle = document.getElementById("taskTitle").value.trim();
+        const taskNote = document.getElementById("taskNote").value.trim();
+        const timelineHours = parseInt(document.getElementById("timelineHours").value, 10);
+
+        if (!employeeId) throw new Error("Please select an employee.");
+        if (!taskTitle) throw new Error("Task title is required.");
+        if (!timelineHours || timelineHours < 1) throw new Error("Timeline must be at least 1 hour.");
+
+        const { error: insertError } = await sb
+          .from("tasks")
+          .insert({
+            company_id: companyId,
+            owner_user_id: user.id,
+            employee_id: employeeId,
+            employee_name: employeeName,
+            task_title: taskTitle,
+            task_note: taskNote || null,
+            timeline_hours: timelineHours,
+            status: "pending"
+          });
+
+        if (insertError) throw insertError;
+
+        setMessage("Task assigned successfully.", "success");
+        document.getElementById("taskForm").reset();
+
+      } catch (err) {
+        console.error("Assign task error:", err);
+        setMessage(err.message || "Could not assign task.", "error");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Assign Task";
+      }
+    });
+
+    guardOwner();
+    loadEmployees();
+  </script>
+</body>
+</html>

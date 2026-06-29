@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bvue42 Lite — Owner Signup</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="db.js"></script>
+  <link rel="manifest" href="manifest.json">
+
+<meta name="theme-color" content="#020617">
+
+<link rel="icon" href="icons/icon-192.png">
+
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+</head>
+<body class="bg-slate-950 text-white min-h-screen flex items-center justify-center px-4">
+
+  <div class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl">
+    <h1 class="text-2xl font-bold mb-2">Create Owner Account</h1>
+    <p class="text-slate-400 mb-6">Set up your Bvue42 Lite workspace</p>
+
+    <form id="signupForm" class="space-y-4">
+      <div>
+        <label class="block text-sm mb-2">Owner Name</label>
+        <input id="ownerName" type="text" required
+          class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 outline-none focus:border-emerald-500"
+          placeholder="Enter your name" />
+      </div>
+
+      <div>
+        <label class="block text-sm mb-2">Company Name</label>
+        <input id="companyName" type="text" required
+          class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 outline-none focus:border-emerald-500"
+          placeholder="Enter company name" />
+      </div>
+
+      <div>
+        <label class="block text-sm mb-2">Email</label>
+        <input id="email" type="email" required
+          class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 outline-none focus:border-emerald-500"
+          placeholder="Enter email" />
+      </div>
+
+      <div>
+        <label class="block text-sm mb-2">Create Bvue42 Password</label>
+        <div class="relative">
+          <input id="password" type="password" required
+            class="w-full rounded-xl bg-slate-950 border border-slate-700 px-4 py-3 pr-12 outline-none focus:border-emerald-500"
+            placeholder="Create password" />
+          <button type="button" id="toggleSignupPassword"
+            class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
+            👁
+          </button>
+        </div>
+      </div>
+
+      <button id="signupBtn" type="submit"
+        class="w-full rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-semibold py-3 transition">
+        Create Workspace
+      </button>
+    </form>
+
+    <p class="text-sm text-slate-400 mt-5">
+      Already have an account?
+      <a href="owner-login.html" class="text-emerald-400 hover:underline">Login</a>
+    </p>
+
+    <p id="message" class="mt-4 text-sm"></p>
+  </div>
+
+  <script>
+    function generateWorkspaceCode() {
+      const random = Math.floor(1000 + Math.random() * 9000);
+      return `BV42-${random}`;
+    }
+
+    function setMessage(text, type = "info") {
+      const msg = document.getElementById("message");
+      msg.textContent = text;
+
+      if (type === "error") {
+        msg.className = "mt-4 text-sm text-red-400";
+      } else if (type === "success") {
+        msg.className = "mt-4 text-sm text-emerald-400";
+      } else {
+        msg.className = "mt-4 text-sm text-slate-400";
+      }
+    }
+
+    // eye toggle
+    document.getElementById("toggleSignupPassword").addEventListener("click", () => {
+      const input = document.getElementById("password");
+      input.type = input.type === "password" ? "text" : "password";
+    });
+
+    document.getElementById("signupForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const signupBtn = document.getElementById("signupBtn");
+      signupBtn.disabled = true;
+      signupBtn.textContent = "Creating...";
+
+      const ownerName = document.getElementById("ownerName").value.trim();
+      const companyName = document.getElementById("companyName").value.trim();
+      const email = document.getElementById("email").value.trim().toLowerCase();
+      const password = document.getElementById("password").value;
+
+      try {
+        if (!ownerName || !companyName || !email || !password) {
+          throw new Error("Please fill all fields.");
+        }
+
+        const { data: authData, error: authError } = await sb.auth.signUp({
+          email,
+          password
+        });
+
+        if (authError) throw authError;
+        if (!authData?.user?.id) {
+          throw new Error("Could not create auth user.");
+        }
+
+        const ownerUserId = authData.user.id;
+
+        let workspaceCode = generateWorkspaceCode();
+
+        for (let i = 0; i < 5; i++) {
+          const { data: existingCode, error: codeError } = await sb
+            .from("companies")
+            .select("id")
+            .eq("workspace_code", workspaceCode)
+            .maybeSingle();
+
+          if (codeError) throw codeError;
+          if (!existingCode) break;
+
+          workspaceCode = generateWorkspaceCode();
+        }
+
+        const { data: companyRow, error: companyError } = await sb
+          .from("companies")
+          .insert({
+            company_name: companyName,
+            workspace_code: workspaceCode,
+            owner_user_id: ownerUserId
+          })
+          .select()
+          .single();
+
+        if (companyError) throw companyError;
+
+        const { error: userError } = await sb
+          .from("users")
+          .insert({
+            id: ownerUserId,
+            company_id: companyRow.id,
+            name: ownerName,
+            email: email,
+            role: "owner",
+            department_name: null,
+            post_name: "Owner"
+          });
+
+        if (userError) throw userError;
+
+        localStorage.setItem("bvue_owner_user_id", ownerUserId);
+        localStorage.setItem("bvue_company_id", companyRow.id);
+        localStorage.setItem("bvue_company_name", companyRow.company_name);
+        localStorage.setItem("bvue_workspace_code", companyRow.workspace_code);
+        localStorage.setItem("bvue_owner_name", ownerName);
+
+        setMessage("Workspace created successfully. Redirecting...", "success");
+
+        setTimeout(() => {
+          window.location.href = "owner-dashboard.html";
+        }, 1000);
+
+      } catch (err) {
+        console.error("Signup error:", err);
+        setMessage(err.message || "Something went wrong.", "error");
+      } finally {
+        signupBtn.disabled = false;
+        signupBtn.textContent = "Create Workspace";
+      }
+    });
+  </script>
+</body>
+</html>
