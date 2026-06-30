@@ -280,12 +280,14 @@ document.getElementById("completedCount").textContent = completed;
     });
 
     document.getElementById("employeeLogoutBtn").addEventListener("click", () => {
-      localStorage.removeItem("bvue_employee_id");
-      localStorage.removeItem("bvue_employee_name");
-      localStorage.removeItem("bvue_employee_email");
-      localStorage.removeItem("bvue_employee_company_id");
-      localStorage.removeItem("bvue_employee_workspace_code");
+     localStorage.removeItem("bvue_employee_id");
+localStorage.removeItem("bvue_employee_name");
+localStorage.removeItem("bvue_employee_email");
+localStorage.removeItem("bvue_employee_company_id");
+localStorage.removeItem("bvue_employee_workspace_code");
+localStorage.removeItem("bvue_employee_company_name");
 
+window.location.href = "index.html";
       redirectToEmployeeLogin();
     });
 

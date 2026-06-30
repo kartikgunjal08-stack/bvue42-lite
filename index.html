@@ -55,6 +55,12 @@
   </div>
 
   <script>
+    // Auto login if employee already logged in
+const employeeId = localStorage.getItem("bvue_employee_id");
+
+if (employeeId) {
+  window.location.href = "employee-dashboard.html";
+}
     function setMessage(text, type = "info") {
       const msg = document.getElementById("message");
       msg.textContent = text;
