@@ -58,6 +58,14 @@
   </div>
 
   <script>
+    // Auto-login if owner session already exists
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+
+  if (session) {
+    window.location.href = "owner-dashboard.html";
+  }
+})();
     function setMessage(text, type = "info") {
       const msg = document.getElementById("message");
       msg.textContent = text;
